@@ -1,0 +1,835 @@
+
+import React, { useMemo, useState } from "react";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { ShoppingCart, Sparkles, HeartPulse, ScrollText, Skull, Users } from "lucide-react";
+
+/**
+ * Plague Trail — an Oregon Trail–style, classroom-friendly game
+ * Theme: An Israelite household in Goshen preparing through the ten plagues (Exodus 7–12).
+ * Mechanics: buy supplies, answer questions, survive events.
+ * Teacher-friendly: kid-friendly language toggle (default ON), adjustable family size.
+ */
+
+const PLAGUES = [
+  {
+    id: 1,
+    name: "Water to Blood",
+    prompt:
+      "The Nile turns to blood. Clean water becomes scarce. How prepared is your household?",
+    need: [{ item: "water", weight: 3 }, { item: "cloth", weight: 1 }],
+    quizTag: "Exodus 7",
+  },
+  {
+    id: 2,
+    name: "Frogs",
+    prompt:
+      "Frogs swarm homes and food stores. Keeping food covered matters.",
+    need: [{ item: "food", weight: 2 }, { item: "containers", weight: 2 }],
+    quizTag: "Exodus 8",
+  },
+  {
+    id: 3,
+    name: "Lice/Gnats",
+    prompt:
+      "Gnats cover people and animals. Hygiene and basic medicine help.",
+    need: [{ item: "soap", weight: 2 }, { item: "medicine", weight: 2 }],
+    quizTag: "Exodus 8",
+  },
+  {
+    id: 4,
+    name: "Flies",
+    prompt:
+      "Swarms of flies fill the land. Protecting food and keeping shelter sealed matters.",
+    need: [{ item: "containers", weight: 2 }, { item: "repellent", weight: 2 }],
+    quizTag: "Exodus 8",
+  },
+  {
+    id: 5,
+    name: "Livestock Pestilence",
+    prompt:
+      "A disease hits livestock. Your household needs alternate food sources.",
+    need: [{ item: "food", weight: 3 }],
+    quizTag: "Exodus 9",
+  },
+  {
+    id: 6,
+    name: "Boils",
+    prompt:
+      "Painful boils spread. Bandages and medicine reduce sickness.",
+    need: [{ item: "medicine", weight: 3 }, { item: "bandages", weight: 2 }],
+    quizTag: "Exodus 9",
+  },
+  {
+    id: 7,
+    name: "Hail",
+    prompt:
+      "Hail damages crops and shelters. Repairs and stored food matter.",
+    need: [{ item: "repairs", weight: 2 }, { item: "food", weight: 2 }],
+    quizTag: "Exodus 9",
+  },
+  {
+    id: 8,
+    name: "Locusts",
+    prompt:
+      "Locusts devour remaining crops. Stored food becomes critical.",
+    need: [{ item: "food", weight: 4 }],
+    quizTag: "Exodus 10",
+  },
+  {
+    id: 9,
+    name: "Darkness",
+    prompt:
+      "Darkness covers the land. Light sources help keep everyone calm and safe.",
+    need: [{ item: "oil", weight: 3 }],
+    quizTag: "Exodus 10",
+  },
+  {
+    id: 10,
+    name: "Passover Night",
+    prompt:
+      "Passover is here. You must be ready with a lamb meal and mark the doorposts.",
+    need: [
+      { item: "lamb", weight: 3 },
+      { item: "hyssop", weight: 2 },
+      { item: "bread", weight: 2 },
+    ],
+    quizTag: "Exodus 12",
+    passover: true,
+  },
+];
+
+const STORE_ITEMS = [
+  { key: "water", name: "Clean Water", desc: "Helps during scarcity", cost: 8 },
+  { key: "food", name: "Food Rations", desc: "Vital when crops/livestock fail", cost: 8 },
+  { key: "bread", name: "Unleavened Bread", desc: "Needed for Passover", cost: 6 },
+  { key: "containers", name: "Covered Containers", desc: "Protects food from pests", cost: 5 },
+  { key: "soap", name: "Soap & Washing", desc: "Reduces sickness", cost: 4 },
+  { key: "repellent", name: "Bug Repellent", desc: "Helps vs flies/gnats", cost: 4 },
+  { key: "medicine", name: "Herbs/Medicine", desc: "Treats illness", cost: 7 },
+  { key: "bandages", name: "Bandages", desc: "Helps with boils/injuries", cost: 5 },
+  { key: "cloth", name: "Cloth Filters", desc: "Strain water; cover items", cost: 3 },
+  { key: "repairs", name: "Repair Kit", desc: "Fix shelter after hail", cost: 6 },
+  { key: "oil", name: "Lamp Oil", desc: "Light during darkness", cost: 6 },
+  { key: "lamb", name: "Passover Lamb", desc: "Needed for Passover", cost: 10 },
+  { key: "hyssop", name: "Hyssop Bundle", desc: "For doorpost marking", cost: 6 },
+];
+
+const QUIZ_BANK = [
+  {
+    tag: "Exodus 7",
+    q: "What sign happened to the Nile as the first plague?",
+    a: "It turned to blood",
+    choices: ["It froze", "It turned to blood", "It dried up", "It overflowed"],
+  },
+  {
+    tag: "Exodus 7",
+    q: "Who confronted Pharaoh and delivered the Lord’s message?",
+    a: "Moses and Aaron",
+    choices: ["Joshua and Caleb", "Moses and Aaron", "Elijah and Elisha", "Peter and John"],
+  },
+  {
+    tag: "Exodus 8",
+    q: "Which plague involved frogs coming up into houses?",
+    a: "The second plague",
+    choices: ["The fifth plague", "The second plague", "The ninth plague", "The tenth plague"],
+  },
+  {
+    tag: "Exodus 9",
+    q: "What was Pharaoh’s repeated response after some plagues eased?",
+    a: "He hardened his heart",
+    choices: ["He repented immediately", "He left Egypt", "He hardened his heart", "He asked Israel to stay"],
+  },
+  {
+    tag: "Exodus 10",
+    q: "What covered the land during the ninth plague?",
+    a: "Darkness",
+    choices: ["Snow", "Darkness", "Floodwater", "Fire"],
+  },
+  {
+    tag: "Exodus 12",
+    q: "What did Israel mark on their doorposts at Passover?",
+    a: "Lamb’s blood",
+    choices: ["Oil", "Lamb’s blood", "Water", "Ash"],
+  },
+  {
+    tag: "Exodus 12",
+    q: "Passover reminded Israel of what?",
+    a: "Deliverance and protection",
+    choices: ["A harvest festival", "Deliverance and protection", "A king’s birthday", "Building the tabernacle"],
+  },
+];
+
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function roll(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function pickQuiz(tag) {
+  const candidates = QUIZ_BANK.filter((x) => x.tag === tag);
+  if (candidates.length === 0) return null;
+  return candidates[Math.floor(Math.random() * candidates.length)];
+}
+
+function computeNeedScore(plague, inv) {
+  // Higher score = better prepared
+  let score = 0;
+  plague.need.forEach(({ item, weight }) => {
+    score += (inv[item] || 0) * weight;
+  });
+  return score;
+}
+
+function getOutcome({ plague, inv, faith, kidFriendly }) {
+  // Determine sickness/risk based on supplies + quiz faith
+  const needScore = computeNeedScore(plague, inv);
+  const baseRisk = 65 - faith * 4; // faith reduces risk
+  const supplyMitigation = clamp(needScore * 6, 0, 50);
+  const risk = clamp(baseRisk - supplyMitigation, 5, 90);
+  const r = roll(1, 100);
+
+  let severity = "safe";
+  if (r <= risk) severity = "sick";
+  if (r <= risk * 0.45) severity = "severe";
+
+  // Passover special condition
+  let passoverPenalty = 0;
+  if (plague.passover) {
+    const hasLamb = (inv.lamb || 0) >= 1;
+    const hasHyssop = (inv.hyssop || 0) >= 1;
+    const hasBread = (inv.bread || 0) >= 1;
+    const missing = [!hasLamb, !hasHyssop, !hasBread].filter(Boolean).length;
+    passoverPenalty = missing * 20;
+  }
+
+  const finalRisk = clamp(risk + passoverPenalty, 5, 95);
+  const rr = roll(1, 100);
+
+  // Re-evaluate with passover rules
+  let finalSeverity = severity;
+  if (rr <= finalRisk) finalSeverity = "sick";
+  if (rr <= finalRisk * 0.45) finalSeverity = "severe";
+
+  const text = {
+    safe: kidFriendly
+      ? "Your household stays healthy enough to continue."
+      : "Your household makes it through with minimal harm.",
+    sick: kidFriendly
+      ? "Some in your household get sick and need rest."
+      : "Illness strikes—your progress slows.",
+    severe: kidFriendly
+      ? "Severe sickness hits. One person can’t continue the journey."
+      : "Severe sickness—someone dies.",
+  };
+
+  return { finalSeverity, finalRisk, narrative: text[finalSeverity] };
+}
+
+function useInitialInventory() {
+  return {
+    water: 0,
+    food: 0,
+    bread: 0,
+    containers: 0,
+    soap: 0,
+    repellent: 0,
+    medicine: 0,
+    bandages: 0,
+    cloth: 0,
+    repairs: 0,
+    oil: 0,
+    lamb: 0,
+    hyssop: 0,
+  };
+}
+
+export default function PlagueTrail() {
+  const [phase, setPhase] = useState("setup"); // setup | store | plague | quiz | result | end
+  const [kidFriendly, setKidFriendly] = useState(true);
+  const [familySize, setFamilySize] = useState(5);
+  const [names, setNames] = useState(["Dad", "Mom", "Firstborn", "Sibling", "Grandparent"]);
+  const [money, setMoney] = useState(45);
+  const [inv, setInv] = useState(useInitialInventory());
+  const [plagueIndex, setPlagueIndex] = useState(0);
+  const [faith, setFaith] = useState(3); // earned by quiz
+  const [health, setHealth] = useState(() => ({ status: "ok", lost: [] }));
+  const [log, setLog] = useState([]);
+  const [cart, setCart] = useState(() => ({}));
+  const [quiz, setQuiz] = useState(null);
+  const [selected, setSelected] = useState(null);
+  const [lastOutcome, setLastOutcome] = useState(null);
+
+  const plague = PLAGUES[plagueIndex];
+
+  const aliveCount = useMemo(() => {
+    return Math.max(0, familySize - (health?.lost?.length || 0));
+  }, [familySize, health]);
+
+  const progress = useMemo(() => {
+    return Math.round((plagueIndex / PLAGUES.length) * 100);
+  }, [plagueIndex]);
+
+  const totalCartCost = useMemo(() => {
+    return Object.entries(cart).reduce((sum, [k, v]) => {
+      const item = STORE_ITEMS.find((x) => x.key === k);
+      return sum + (item ? item.cost * v : 0);
+    }, 0);
+  }, [cart]);
+
+  function resetGame() {
+    setPhase("setup");
+    setMoney(45);
+    setInv(useInitialInventory());
+    setPlagueIndex(0);
+    setFaith(3);
+    setHealth({ status: "ok", lost: [] });
+    setLog([]);
+    setCart({});
+    setQuiz(null);
+    setSelected(null);
+    setLastOutcome(null);
+  }
+
+  function start() {
+    // ensure names length
+    const n = [...names];
+    while (n.length < familySize) n.push(`Member ${n.length + 1}`);
+    setNames(n.slice(0, familySize));
+    setPhase("store");
+    setLog([
+      {
+        t: "You are an Israelite household in Goshen. Survive the plagues, build faith, and prepare for Passover.",
+        k: "start",
+      },
+    ]);
+  }
+
+  function addToCart(key, qty) {
+    setCart((c) => {
+      const next = { ...c };
+      const val = clamp((next[key] || 0) + qty, 0, 99);
+      if (val === 0) delete next[key];
+      else next[key] = val;
+      return next;
+    });
+  }
+
+  function checkout() {
+    if (totalCartCost > money) return;
+    setMoney((m) => m - totalCartCost);
+    setInv((i) => {
+      const next = { ...i };
+      Object.entries(cart).forEach(([k, v]) => {
+        next[k] = (next[k] || 0) + v;
+      });
+      return next;
+    });
+    setCart({});
+    setLog((L) => [
+      ...L,
+      { t: `You purchased supplies for ${totalCartCost} coins.`, k: `buy-${Date.now()}` },
+    ]);
+    // proceed to plague
+    setPhase("plague");
+  }
+
+  function beginQuiz() {
+    const q = pickQuiz(plague.quizTag) || {
+      tag: plague.quizTag,
+      q: "Quick check: What did Moses ask Pharaoh to do?",
+      a: "Let Israel go",
+      choices: ["Build a palace", "Let Israel go", "Send more chariots", "Change the river"],
+    };
+    setQuiz(q);
+    setSelected(null);
+    setPhase("quiz");
+  }
+
+  function answer(choice) {
+    setSelected(choice);
+  }
+
+  function submitAnswer() {
+    if (!quiz || selected == null) return;
+    const correct = selected === quiz.a;
+    if (correct) {
+      setFaith((f) => clamp(f + 1, 0, 12));
+      setLog((L) => [
+        ...L,
+        { t: `Correct! Faith +1.`, k: `q-${Date.now()}` },
+      ]);
+    } else {
+      setFaith((f) => clamp(f - 1, 0, 12));
+      setLog((L) => [
+        ...L,
+        { t: `Not quite. Correct answer: “${quiz.a}”. Faith -1.`, k: `q-${Date.now()}` },
+      ]);
+    }
+
+    // resolve plague outcome after quiz
+    const out = getOutcome({ plague, inv, faith: correct ? faith + 1 : faith - 1, kidFriendly });
+
+    // apply consequence
+    if (out.finalSeverity === "safe") {
+      setHealth((h) => ({ ...h, status: "ok" }));
+    }
+    if (out.finalSeverity === "sick") {
+      setHealth((h) => ({ ...h, status: "sick" }));
+      // consume some medicine if available
+      setInv((i) => {
+        const next = { ...i };
+        if ((next.medicine || 0) > 0) next.medicine -= 1;
+        return next;
+      });
+    }
+    if (out.finalSeverity === "severe") {
+      // lose one member
+      setHealth((h) => {
+        const lost = [...(h.lost || [])];
+        const candidates = names.filter((_, idx) => !lost.includes(idx));
+        const aliveIdx = names
+          .map((_, idx) => idx)
+          .filter((idx) => !lost.includes(idx));
+        const pick = aliveIdx.length ? aliveIdx[Math.floor(Math.random() * aliveIdx.length)] : null;
+        if (pick != null) lost.push(pick);
+        return { status: "severe", lost };
+      });
+      // consume more supplies
+      setInv((i) => {
+        const next = { ...i };
+        if ((next.medicine || 0) > 0) next.medicine -= 1;
+        if ((next.bandages || 0) > 0) next.bandages -= 1;
+        return next;
+      });
+    }
+
+    setLastOutcome(out);
+    setPhase("result");
+  }
+
+  function nextPlague() {
+    const nextIndex = plagueIndex + 1;
+    if (aliveCount <= 0) {
+      setPhase("end");
+      setLog((L) => [
+        ...L,
+        { t: kidFriendly ? "Your household can’t continue." : "Everyone is gone. Game over.", k: `end-${Date.now()}` },
+      ]);
+      return;
+    }
+    if (nextIndex >= PLAGUES.length) {
+      setPhase("end");
+      setLog((L) => [
+        ...L,
+        { t: "You endured the plagues and are ready to leave Egypt!", k: `win-${Date.now()}` },
+      ]);
+      return;
+    }
+
+    // small upkeep each round
+    setInv((i) => {
+      const next = { ...i };
+      // consume food/water proportional to survivors
+      const eat = Math.max(1, Math.ceil(aliveCount / 3));
+      next.food = Math.max(0, (next.food || 0) - eat);
+      next.water = Math.max(0, (next.water || 0) - eat);
+      return next;
+    });
+
+    setPlagueIndex(nextIndex);
+    setPhase("store");
+  }
+
+  const lostNames = useMemo(() => {
+    return (health?.lost || []).map((idx) => names[idx]).filter(Boolean);
+  }, [health, names]);
+
+  const titleSub = kidFriendly ? "Kid-friendly mode" : "Classic mode";
+
+  return (
+    <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-4">
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Plague Trail</h1>
+          <p className="text-muted-foreground">An Oregon Trail–style seminary game: prepare, quiz, endure, and be ready for Passover.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Switch checked={kidFriendly} onCheckedChange={setKidFriendly} />
+            <Label className="text-sm">{titleSub}</Label>
+          </div>
+          <Button variant="outline" onClick={resetGame}>Reset</Button>
+        </div>
+      </div>
+
+      <Card className="rounded-2xl shadow-sm">
+        <CardContent className="pt-6">
+          <div className="flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="rounded-xl">Plague {plagueIndex + 1} / {PLAGUES.length}</Badge>
+              <Badge variant="outline" className="rounded-xl">Faith: {faith}</Badge>
+              <Badge variant="outline" className="rounded-xl">Coins: {money}</Badge>
+            </div>
+            <div className="flex items-center gap-3">
+              <Users className="w-4 h-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground">Household able to continue: </span>
+              <span className="text-sm font-medium">{aliveCount} / {familySize}</span>
+            </div>
+          </div>
+          <div className="mt-4">
+            <Progress value={progress} />
+            <p className="mt-1 text-xs text-muted-foreground">Progress toward Exodus readiness</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {phase === "setup" && (
+        <Card className="rounded-2xl shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Sparkles className="w-5 h-5" /> Setup</CardTitle>
+            <CardDescription>Choose your household and start the journey through the ten plagues.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert>
+              <AlertTitle>Teacher note</AlertTitle>
+              <AlertDescription>
+                Kid-friendly mode avoids direct language about death (it becomes “can’t continue”). You can switch to classic mode if appropriate for your class.
+              </AlertDescription>
+            </Alert>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>Household size (3–8)</Label>
+                <Input
+                  type="number"
+                  min={3}
+                  max={8}
+                  value={familySize}
+                  onChange={(e) => setFamilySize(clamp(parseInt(e.target.value || "5", 10), 3, 8))}
+                />
+                <p className="text-xs text-muted-foreground">More people = more supplies needed each round.</p>
+              </div>
+              <div className="md:col-span-2 space-y-2">
+                <Label>Names (optional)</Label>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  {Array.from({ length: familySize }).map((_, i) => (
+                    <Input
+                      key={i}
+                      placeholder={`Member ${i + 1}`}
+                      value={names[i] || ""}
+                      onChange={(e) => {
+                        const n = [...names];
+                        n[i] = e.target.value;
+                        setNames(n);
+                      }}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">Tip: Use “Firstborn” for one member to make Passover meaningful.</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end">
+              <Button onClick={start}>Start the Trail</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {phase === "store" && (
+        <Card className="rounded-2xl shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><ShoppingCart className="w-5 h-5" /> Market & Preparation</CardTitle>
+            <CardDescription>Spend coins to prepare for the next plague: <span className="font-medium">{plague?.name}</span>.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <div className="lg:col-span-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {STORE_ITEMS.map((it) => (
+                    <Card key={it.key} className="rounded-2xl">
+                      <CardContent className="pt-5 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="font-medium">{it.name}</div>
+                            <div className="text-xs text-muted-foreground">{it.desc}</div>
+                          </div>
+                          <Badge className="rounded-xl" variant="secondary">{it.cost} coins</Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="text-xs text-muted-foreground">Owned: {inv[it.key] || 0}</div>
+                          <div className="flex items-center gap-2">
+                            <Button variant="outline" size="sm" onClick={() => addToCart(it.key, -1)}>-</Button>
+                            <Badge variant="outline" className="rounded-xl">{cart[it.key] || 0}</Badge>
+                            <Button variant="outline" size="sm" onClick={() => addToCart(it.key, +1)}>+</Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Card className="rounded-2xl">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Cart</CardTitle>
+                    <CardDescription>Buy supplies before the plague hits.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      {Object.keys(cart).length === 0 ? (
+                        <p className="text-sm text-muted-foreground">Your cart is empty.</p>
+                      ) : (
+                        Object.entries(cart).map(([k, v]) => {
+                          const it = STORE_ITEMS.find((x) => x.key === k);
+                          return (
+                            <div key={k} className="flex items-center justify-between text-sm">
+                              <span>{it?.name || k} × {v}</span>
+                              <span className="text-muted-foreground">{(it?.cost || 0) * v}</span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                    <Separator />
+                    <div className="flex items-center justify-between text-sm">
+                      <span>Total</span>
+                      <span className={totalCartCost > money ? "text-destructive font-medium" : "font-medium"}>{totalCartCost} coins</span>
+                    </div>
+                    <Button className="w-full" onClick={checkout} disabled={totalCartCost === 0 || totalCartCost > money}>
+                      Buy & Face the Plague
+                    </Button>
+                    <p className="text-xs text-muted-foreground">Tip: You can also choose to buy nothing—sometimes faith and wisdom carry you.</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-2xl">
+                  <CardHeader>
+                    <CardTitle className="text-lg">Household Status</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <HeartPulse className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm">Condition:</span>
+                      <Badge variant={health.status === "ok" ? "secondary" : health.status === "sick" ? "outline" : "destructive"} className="rounded-xl">
+                        {health.status}
+                      </Badge>
+                    </div>
+                    {lostNames.length > 0 && (
+                      <div className="text-sm text-muted-foreground">
+                        {kidFriendly ? (
+                          <>Can’t continue: <span className="font-medium">{lostNames.join(", ")}</span></>
+                        ) : (
+                          <>Lost: <span className="font-medium">{lostNames.join(", ")}</span></>
+                        )}
+                      </div>
+                    )}
+                    <div className="text-xs text-muted-foreground">Upkeep each round uses food + water based on survivors.</div>
+                  </CardContent>
+                </Card>
+
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {phase === "plague" && (
+        <Card className="rounded-2xl shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><ScrollText className="w-5 h-5" /> {plague?.name}</CardTitle>
+            <CardDescription>{plague?.prompt}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Card className="rounded-2xl">
+                <CardHeader>
+                  <CardTitle className="text-lg">Preparation check</CardTitle>
+                  <CardDescription>Based on your supplies for this plague.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="text-sm">
+                    Need-score: <span className="font-medium">{computeNeedScore(plague, inv)}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">Higher score reduces risk. Faith also helps.</div>
+                  {plague?.passover && (
+                    <Alert>
+                      <AlertTitle>Passover requirements</AlertTitle>
+                      <AlertDescription>
+                        Recommended: <b>Lamb</b>, <b>Hyssop</b>, and <b>Unleavened bread</b>. Missing items increases risk.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl">
+                <CardHeader>
+                  <CardTitle className="text-lg">Ready for a quick question?</CardTitle>
+                  <CardDescription>Answering builds or drains faith.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button onClick={beginQuiz} className="w-full">Take the Quiz</Button>
+                  <p className="text-xs text-muted-foreground">Teacher option: have teams discuss before choosing.</p>
+                </CardContent>
+              </Card>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {phase === "quiz" && quiz && (
+        <Card className="rounded-2xl shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Sparkles className="w-5 h-5" /> Quiz ({quiz.tag})</CardTitle>
+            <CardDescription>Choose the best answer.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-lg font-medium">{quiz.q}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              {quiz.choices.map((c) => (
+                <Button
+                  key={c}
+                  variant={selected === c ? "default" : "outline"}
+                  className="justify-start h-auto py-3 rounded-2xl"
+                  onClick={() => answer(c)}
+                >
+                  {c}
+                </Button>
+              ))}
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => { setPhase("plague"); setQuiz(null); }}>Back</Button>
+              <Button onClick={submitAnswer} disabled={selected == null}>Submit</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {phase === "result" && (
+        <Card className="rounded-2xl shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              {kidFriendly ? <HeartPulse className="w-5 h-5" /> : <Skull className="w-5 h-5" />}
+              Outcome — {plague?.name}
+            </CardTitle>
+            <CardDescription>What happened as the plague passed over the land?</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {lastOutcome && (
+              <Alert>
+                <AlertTitle>Result</AlertTitle>
+                <AlertDescription>
+                  {lastOutcome.narrative}
+                  <div className="mt-2 text-xs text-muted-foreground">Estimated risk: {Math.round(lastOutcome.finalRisk)}%</div>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <Card className="rounded-2xl">
+                <CardHeader>
+                  <CardTitle className="text-lg">Current inventory</CardTitle>
+                </CardHeader>
+                <CardContent className="text-sm">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                    {STORE_ITEMS.map((it) => (
+                      <div key={it.key} className="flex justify-between">
+                        <span className="text-muted-foreground">{it.name}</span>
+                        <span className="font-medium">{inv[it.key] || 0}</span>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl">
+                <CardHeader>
+                  <CardTitle className="text-lg">Household</CardTitle>
+                  <CardDescription>Those still able to continue</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {names.map((n, idx) => {
+                    const lost = (health?.lost || []).includes(idx);
+                    return (
+                      <div key={idx} className="flex items-center justify-between text-sm">
+                        <span className={lost ? "line-through text-muted-foreground" : "font-medium"}>{n}</span>
+                        {lost ? (
+                          <Badge variant={kidFriendly ? "outline" : "destructive"} className="rounded-xl">{kidFriendly ? "can’t continue" : "dead"}</Badge>
+                        ) : (
+                          <Badge variant="secondary" className="rounded-xl">ok</Badge>
+                        )}
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="flex items-center justify-end">
+              <Button onClick={nextPlague}>Continue</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {phase === "end" && (
+        <Card className="rounded-2xl shadow-sm">
+          <CardHeader>
+            <CardTitle>Game Over / Victory</CardTitle>
+            <CardDescription>Review what your choices taught about preparation, faith, and deliverance.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert>
+              <AlertTitle>Debrief questions (great for seminary)</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc ml-5 space-y-1">
+                  <li>What choices helped your household most—supplies or faith? Why?</li>
+                  <li>How did repeated choices mirror Pharaoh’s pattern of hardening his heart?</li>
+                  <li>What does Passover teach about preparation and trusting God?</li>
+                  <li>How can we “prepare” spiritually today?</li>
+                </ul>
+              </AlertDescription>
+            </Alert>
+            <div className="flex items-center gap-2 justify-end">
+              <Button variant="outline" onClick={resetGame}>Play Again</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="rounded-2xl shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg">Trail Log</CardTitle>
+          <CardDescription>Quick recap of what happened</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="max-h-56 overflow-auto space-y-2">
+            {log.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No events yet.</p>
+            ) : (
+              log.map((e) => (
+                <div key={e.k} className="text-sm">• {e.t}</div>
+              ))
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      <p className="text-xs text-muted-foreground">
+        Classroom tip: Put students in teams. Each team debates purchases and answers. Rotate a “scribe” to click choices. Keep the tone respectful—this is a learning activity.
+      </p>
+    </div>
+  );
+}
