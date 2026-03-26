@@ -833,3 +833,8 @@ export default function PlagueTrail() {
     </div>
   );
 }
+{
+  "scripts": {
+    "build": "vite build"
+  }
+}
